@@ -17,6 +17,10 @@ func (s *Server) RegisterRoutes() http.Handler {
 	e := echo.New()
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*", "http://localhost:3000"},
+		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},
+	}))
 
 	e.GET("/", s.HelloWorldHandler)
 
@@ -36,7 +40,14 @@ func (s *Server) HelloWorldHandler(c echo.Context) error {
 func (s *Server) websocketHandler(c echo.Context) error {
 	w := c.Response().Writer
 	r := c.Request()
-	socket, err := websocket.Accept(w, r, nil)
+	socket, err := websocket.Accept(
+		w, r,
+		&websocket.AcceptOptions{
+			OriginPatterns: []string{
+				"localhost:3000",
+			},
+		},
+	)
 
 	if err != nil {
 		log.Printf("could not open websocket: %v", err)
