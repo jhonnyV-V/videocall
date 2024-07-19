@@ -1,44 +1,65 @@
 import type { Component } from 'solid-js';
-import { onCleanup } from "solid-js";
-import Websocket from 'websocket';
+import { onCleanup, createUniqueId } from "solid-js";
+import { useParams } from "@solidjs/router";
 
-const Room: Component = () => {
-  const connection = new RTCPeerConnection();
+const USER_EVENT = "USER";
+const JOIN_EVENT = "JOIN_ROOM";
+const OFFER_EVENT = "OFFER";
 
-  const ws = new Websocket.w3cwebsocket(
-    "ws://localhost:8080/websocket",
-    undefined,
-    undefined,
-    { "access-control-allow-origin": "*" },
-  );
-  ws.onopen = function() {
-    console.log("Connected");
-  };
-  ws.onerror = function(error: Error) {
-    console.log("error");
-    console.log(error)
-  }
-  ws.onclose = function() {
-    console.log("closed");
-  }
+function onMessage(
+  id: string,
+  roomId: string,
+  ws: WebSocket,
+) {
 
-  ws.onmessage = async function(message: Websocket.IMessageEvent) {
+  return async function(message: MessageEvent) {
     console.log("message");
     console.log(message);
     console.log(message.data);
 
-    if (message.data === "createoffer") {
-      const offer = await connection.createOffer();
-      connection.setLocalDescription(offer);
-      ws.send(JSON.stringify(offer))
+    if (message.data == USER_EVENT) {
+      ws.send(JOIN_EVENT + roomId)
     }
   }
+}
 
-  //if did not created the call join instead of creating an offer
+const Room: Component = () => {
+  const id = createUniqueId();
+  const params = useParams();
+  const roomId = params.roomId;
+  const connections = new Map<string, RTCPeerConnection>();
+  // const offer = await connection.createOffer();
+  // connection.setLocalDescription(offer);
+  // ws.send(JSON.stringify(offer))
+
+  const ws = new WebSocket(
+    "ws://localhost:8080/websocket",
+    //{ "access-control-allow-origin": "*" },
+  );
+
+  ws.onopen = async function() {
+    console.log("Connected");
+    const response = USER_EVENT + " " + id;
+    console.log(response);
+    ws.send(response);
+  };
+  ws.onerror = function(error: Event) {
+    console.log("error");
+    console.log(error);
+  };
+  ws.onclose = function() {
+    console.log("closed");
+  };
+
+  ws.onmessage = onMessage(
+    id,
+    roomId,
+    ws,
+  );
 
   onCleanup(() => {
-    ws.close()
-  })
+    ws.close();
+  });
 
   return (
     <main class="bg-gray-950 text-green-500 w-screen h-screen flex">

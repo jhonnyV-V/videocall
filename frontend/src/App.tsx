@@ -6,7 +6,7 @@ const App: Component = () => {
   const navigate = useNavigate();
 
   function handleClick() {
-    navigate("/room/1")
+    navigate("/room/1?admin=1")
   }
 
   return (
