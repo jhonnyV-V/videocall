@@ -56,18 +56,35 @@ func (s *Server) websocketHandler(c echo.Context) error {
 		return nil
 	}
 
-	defer socket.Close(websocket.StatusGoingAway, "server closing websocket")
+	defer func() {
+		socket.Close(websocket.StatusGoingAway, "server closing websocket")
+	}()
 
 	ctx := r.Context()
-	socketCtx := socket.CloseRead(ctx)
+
+	err = socket.Write(ctx, websocket.MessageText, []byte("createoffer"))
+	if err != nil {
+		return nil
+	}
 
 	for {
-		payload := fmt.Sprintf("server timestamp: %d", time.Now().UnixNano())
-		err := socket.Write(socketCtx, websocket.MessageText, []byte(payload))
+		mt, message, err := socket.Read(ctx)
 		if err != nil {
 			break
 		}
-		time.Sleep(time.Second * 2)
+
+		if mt == websocket.MessageText {
+			if "{\"type\":\"offer\"" == string(message[:15]) {
+				err = socket.Write(ctx, websocket.MessageText, []byte("offer received"))
+			}
+
+			if err != nil {
+				break
+			}
+		}
+
+		fmt.Println(string(message))
+		time.Sleep(time.Millisecond * 2)
 	}
 	return nil
 }

@@ -3,6 +3,8 @@ import { onCleanup } from "solid-js";
 import Websocket from 'websocket';
 
 const Room: Component = () => {
+  const connection = new RTCPeerConnection();
+
   const ws = new Websocket.w3cwebsocket(
     "ws://localhost:8080/websocket",
     undefined,
@@ -12,20 +14,26 @@ const Room: Component = () => {
   ws.onopen = function() {
     console.log("Connected");
   };
-  ws.onerror = function(error) {
+  ws.onerror = function(error: Error) {
     console.log("error");
-    console.log(error);
+    console.log(error)
   }
   ws.onclose = function() {
     console.log("closed");
   }
 
-  ws.onmessage = function(message) {
+  ws.onmessage = async function(message: Websocket.IMessageEvent) {
     console.log("message");
     console.log(message);
+    console.log(message.data);
+
+    if (message.data === "createoffer") {
+      const offer = await connection.createOffer();
+      connection.setLocalDescription(offer);
+      ws.send(JSON.stringify(offer))
+    }
   }
 
-  //const connection = new RTCPeerConnection();
   //if did not created the call join instead of creating an offer
 
   onCleanup(() => {
