@@ -89,19 +89,34 @@ func leaveRoom(ws *Socket) {
 	rooms[ws.RoomId] = filteredIds
 }
 
-func joinRoom(message []byte, mt websocket.MessageType, ws *Socket) (websocket.MessageType, []byte, error) {
+func joinRoom(
+	message []byte,
+	mt websocket.MessageType,
+	ws *Socket,
+) (
+	websocket.MessageType,
+	[]byte,
+	string,
+	bool,
+	error,
+) {
 	rt := websocket.MessageText
 	if ws.Id == "" {
-		return rt, []byte{}, fmt.Errorf("No User Id")
+		return rt, []byte{}, "", false, fmt.Errorf("No User Id")
 	}
 
 	roomId, _ := getId(message, mt)
+	fmt.Printf("roomId %s\n", roomId)
+	fmt.Printf("message %q\n", message)
 
 	attendants := rooms[roomId]
+
+	var isAdmin bool
 
 	if len(attendants) == 0 {
 		ws.IsAdmin = true
 		ws.RoomId = roomId
+		isAdmin = true
 		connections[ws.Id] = *ws
 	}
 
@@ -115,7 +130,7 @@ func joinRoom(message []byte, mt websocket.MessageType, ws *Socket) (websocket.M
 
 	attendants = append(attendants, ws.Id)
 	rooms[roomId] = attendants
-	return rt, response, nil
+	return rt, response, roomId, isAdmin, nil
 }
 
 func sendOffer(message []byte, mt websocket.MessageType, ws *Socket, ctx context.Context) error {
@@ -185,16 +200,21 @@ func (s *Server) websocketHandler(c echo.Context) error {
 
 		switch command {
 		case USER:
-			wrapSocket = setUser(message[offset:], socket)
+			wrapSocket = setUser(message[offset+1:], socket)
 			rt = websocket.MessageText
 			response = []byte(USER)
 
 		case JOIN_ROOM:
-			rt, response, err = joinRoom(
-				message[offset:],
+			var isAdmin bool
+			var roomId string
+			rt, response, roomId, isAdmin, err = joinRoom(
+				message[offset+1:],
 				mt,
 				wrapSocket,
 			)
+			wrapSocket.RoomId = roomId
+			wrapSocket.IsAdmin = isAdmin
+			fmt.Printf("*Socket %#v and room %#v\n", wrapSocket, rooms[wrapSocket.RoomId])
 
 		case LEAVE_ROOM:
 			leaveRoom(wrapSocket)

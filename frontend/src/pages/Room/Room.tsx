@@ -1,6 +1,7 @@
 import type { Component } from 'solid-js';
-import { onCleanup, createUniqueId } from "solid-js";
+import { onCleanup } from "solid-js";
 import { useParams } from "@solidjs/router";
+import { v4 as uuid } from "uuid";
 
 const USER_EVENT = "USER";
 const JOIN_EVENT = "JOIN_ROOM";
@@ -10,6 +11,7 @@ function onMessage(
   id: string,
   roomId: string,
   ws: WebSocket,
+  connections: Map<string, RTCPeerConnection>,
 ) {
 
   return async function(message: MessageEvent) {
@@ -18,19 +20,29 @@ function onMessage(
     console.log(message.data);
 
     if (message.data == USER_EVENT) {
-      ws.send(JOIN_EVENT + roomId)
+      ws.send(JOIN_EVENT + ' ' + roomId)
+      return
+    }
+
+    if (message.data!.startsWith('Joined')) {
+      const targetsStr: string = message.data.slice(7)
+      const targets = targetsStr.split(',');
+      for (const target of targets) {
+        const connection = new RTCPeerConnection()
+        const offer = await connection.createOffer();
+        connection.setLocalDescription(offer);
+        ws.send(`${OFFER_EVENT} ${target} ${JSON.stringify(offer)}`)
+        connections.set(target, connection)
+      }
     }
   }
 }
 
 const Room: Component = () => {
-  const id = createUniqueId();
+  const id = uuid();
   const params = useParams();
   const roomId = params.roomId;
   const connections = new Map<string, RTCPeerConnection>();
-  // const offer = await connection.createOffer();
-  // connection.setLocalDescription(offer);
-  // ws.send(JSON.stringify(offer))
 
   const ws = new WebSocket(
     "ws://localhost:8080/websocket",
@@ -55,6 +67,7 @@ const Room: Component = () => {
     id,
     roomId,
     ws,
+    connections,
   );
 
   onCleanup(() => {
