@@ -28,6 +28,8 @@ type Socket struct {
 }
 
 var connections map[string]Socket
+
+// TODO: change for a mutex
 var rooms map[string][]string
 
 func getCommand(message []byte, mt websocket.MessageType) (string, int) {
@@ -79,7 +81,7 @@ func leaveRoom(ws *Socket) {
 	if len(ids) == 0 {
 		return
 	}
-	filteredIds := make([]string, len(ids))
+	filteredIds := []string{}
 	for _, v := range ids {
 		if v != ws.Id {
 			filteredIds = append(filteredIds, v)
@@ -125,7 +127,7 @@ func joinRoom(
 	if ws.IsAdmin {
 		response = []byte("Admin")
 	} else {
-		response = []byte("Joined" + strings.Join(attendants, ","))
+		response = []byte("Joined " + strings.Join(attendants, ","))
 	}
 
 	attendants = append(attendants, ws.Id)
@@ -140,6 +142,25 @@ func sendOffer(message []byte, mt websocket.MessageType, ws *Socket, ctx context
 	receiverId, offset := getId(message, mt)
 
 	response.WriteString(OFFER)
+	response.WriteString(" ")
+	response.WriteString(ws.Id)
+	response.WriteString(string(message[offset:]))
+
+	receiver := connections[receiverId]
+	if receiver == (Socket{}) {
+		return fmt.Errorf("Send Offer: No connection with id %s", receiverId)
+	}
+
+	return receiver.Conn.Write(ctx, rt, []byte(response.String()))
+}
+
+func sendAnswer(message []byte, mt websocket.MessageType, ws *Socket, ctx context.Context) error {
+	rt := websocket.MessageText
+	var response strings.Builder
+
+	receiverId, offset := getId(message, mt)
+
+	response.WriteString(ANSWER)
 	response.WriteString(" ")
 	response.WriteString(ws.Id)
 	response.WriteString(string(message[offset:]))
@@ -221,11 +242,26 @@ func (s *Server) websocketHandler(c echo.Context) error {
 
 		case OFFER:
 			err = sendOffer(
-				message[offset:],
+				message[offset+1:],
 				mt,
 				wrapSocket,
 				ctx,
 			)
+			if err != nil {
+				fmt.Printf("Failed to send offer %s\n", err)
+			}
+
+		case ANSWER:
+			err = sendAnswer(
+				message[offset+1:],
+				mt,
+				wrapSocket,
+				ctx,
+			)
+			if err != nil {
+				fmt.Printf("Failed to send answer %s\n", err)
+			}
+
 		}
 
 		if err != nil {
