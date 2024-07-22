@@ -14,7 +14,7 @@ const Video: Component = (rawProps: PropsType) => {
     refVideo().srcObject = local.srcObject
   });
 
-  return <video ref={setRefVideo} {...props} />
+  return <video class='w-4/12 h-4/12' ref={setRefVideo} {...props} />
 };
 
 
