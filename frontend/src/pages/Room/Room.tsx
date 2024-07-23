@@ -14,12 +14,24 @@ const [localAudio, setLocalAudio] = createSignal(false);
 const [localVideo, setLocalVideo] = createSignal(false);
 
 
-const [audioSender, setAudioSender] = createSignal(false);
-const [videoSender, setVideoSender] = createSignal(false);
 
 async function getUserMedia() {
   return await navigator.mediaDevices.getUserMedia({ audio: localAudio(), video: localVideo() });
 }
+
+const config = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+  ],
+  configuration: {
+    offerToReceiveAudio: true,
+    offerToReceiveVideo: true,
+  }
+};
 
 function onMessage(
   roomId: string,
@@ -41,7 +53,7 @@ function onMessage(
       const targetsStr: string = message.data.slice(7)
       const targets = targetsStr.split(',');
       for (const target of targets) {
-        const connection = new RTCPeerConnection()
+        const connection = new RTCPeerConnection(config);
         const offer = await connection.createOffer();
         connection.onicecandidate = function(candidate) {
           console.log("on ice candidate", candidate);
@@ -64,7 +76,7 @@ function onMessage(
       const userIdIndex = targetsStr.indexOf(' ');
       const offerId = targetsStr.slice(0, userIdIndex);
       const offer = JSON.parse(targetsStr.slice(userIdIndex + 1));
-      const connection = new RTCPeerConnection();
+      const connection = new RTCPeerConnection(config);
       connection.setRemoteDescription(offer);
       const answer = await connection.createAnswer();
       connection.setLocalDescription(answer);
